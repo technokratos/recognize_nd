@@ -163,4 +163,8 @@ class Point(val x: Double, val y: Double) : IPoint<Point> {
         val y=  P0y+t*(P1y-P0y)
         return Point(x,y)
     }
+
+    override fun times(scale: Double): Point {
+        return of(x * scale, y * scale)
+    }
 }

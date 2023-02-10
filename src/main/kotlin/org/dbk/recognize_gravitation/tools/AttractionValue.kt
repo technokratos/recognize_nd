@@ -2,19 +2,21 @@ package org.dbk.recognize_gravitation.tools
 
 interface  AttractionValue<A : AttractionValue<A>>{
     fun add(other: A) : A
-    fun <P:IPoint<P>> weightedPosition(point: IPoint<P>): P
+    fun <P:IPoint<P>> weightedPosition(point: P): P
     fun correlation(a: A): A
     fun absoluteValue() : Double
     operator fun div(d: Double): A
     operator fun times(d: Double): A
+    fun <P : IPoint<P>> getForceFromPointToPoint(dir: P): P
 }
 
 class AttractionVector<T : IPoint<T>>(private val value: T) : AttractionValue<AttractionVector<T>> {
     override fun add(other: AttractionVector<T>): AttractionVector<T> {
+
         return AttractionVector(value.add(other.value as T))
     }
 
-    override fun <P : IPoint<P>> weightedPosition(point: IPoint<P>): P {
+    override fun <P : IPoint<P>> weightedPosition(point:  P): P {
         TODO("Not yet implemented")
     }
 
@@ -34,14 +36,22 @@ class AttractionVector<T : IPoint<T>>(private val value: T) : AttractionValue<At
         TODO("Not yet implemented")
     }
 
+    override fun <P : IPoint<P>> getForceFromPointToPoint(dir: P): P {
+        TODO("Not yet implemented")
+    }
+
 }
 class AttractionScalar(val value: Double) : AttractionValue<AttractionScalar> {
     override fun add(other: AttractionScalar): AttractionScalar {
         return AttractionScalar(other.value + value)
     }
 
-    override fun <P : IPoint<P>> weightedPosition(point: IPoint<P>): P {
-        return point.multiply(value)
+    override fun <P : IPoint<P>> weightedPosition(point: P): P {
+        return point * value
+    }
+
+    override fun <P : IPoint<P>> getForceFromPointToPoint(dir: P): P {
+        return dir * value
     }
 
     override fun correlation(a: AttractionScalar): AttractionScalar {
@@ -59,6 +69,8 @@ class AttractionScalar(val value: Double) : AttractionValue<AttractionScalar> {
     override fun times(d: Double): AttractionScalar {
         return AttractionScalar(value * d)
     }
+
+
 
 }
 

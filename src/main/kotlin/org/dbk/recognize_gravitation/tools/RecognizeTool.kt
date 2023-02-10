@@ -55,20 +55,24 @@ class RecognizeTool<P: IPoint<P>, A: AttractionValue<A>>(
     fun findNearestPosition(first: MassObject<P,A>, second: MassObject<P,A>): Double {
         val dir = second.point.subtract(first.point)
 
-        val resultantForcesByItems = first.masses.map { firstMass ->
-            val resultantForce = second.masses.map { secondMass -> force(firstMass, secondMass) }
+        val resultantForcesByItems = first.masses.map { firstItem ->
+            val resultantForce = second.masses.map { anotherItem -> force(firstItem, anotherItem) }
                 .reduce { acc, p -> acc.add(p) }
-            Pair(firstMass, resultantForce)
+            Pair(firstItem, resultantForce)
         }
-        var resultantForce: P = resultantForcesByItems.first().second
-        val firstCenter = first.point
+        val resultantForce = resultantForcesByItems.map { it.second }.reduce { acc, p -> acc.add(p) }
+        val center = first.point
+        resultantForcesByItems.map {pair ->
+            val position = pair.first.point
+            val force = pair.second
+            val attractionFunction: (Line<P, AttractionScalar>) -> AttractionScalar = { return@Line AttractionScalar(0.0) }
 
-        val firstMoment: Double
-        resultantForcesByItems.asSequence().drop(1).forEach {
-            resultantForce = resultantForce.add(it.second)
-
+            val line = Line(position, position.add(force), attractionFunction)
+            val perpendicularToLine = position.perpendicularToLine(line)
 
         }
+
+
 
 
     }
@@ -81,8 +85,9 @@ class RecognizeTool<P: IPoint<P>, A: AttractionValue<A>>(
         val massMultiplication = firstMass.attraction.correlation(secondMass.attraction)
         val div = firstMass.point.subtract(secondMass.point)
         val len = div.length()
-        val dir = div.div(len)
-         (massMultiplication / (len * len)) * k
+        val dir = div / len
+        // dir  * m1 * m2 * k / len^2
+        return (massMultiplication * k / (len * len)).getForceFromPointToPoint(dir)
     }
 
 
@@ -106,20 +111,20 @@ class RecognizeTool<P: IPoint<P>, A: AttractionValue<A>>(
             .flatMap { it }
             .map { Mass(it.middle(), it.attractionValue()) }
             .toList()
-        val value = masses.first().attraction
-        val firstPoint = value.weightedPosition(masses.first().point)
-
-        //val totalMass = masses.map { it.value }.reduce { acc: A, it: A -> acc.add(it) }
-        val totalMass = masses.map { it.attraction }.reduce { acc: A, it: A -> acc.add(it) }
-        val weightedPoint = masses.stream()
-            .skip(1)
-            .map { it.attraction.weightedPosition(it.point) }
-            .collect(
-                { firstPoint },
-                { left, right -> left.add(right) },
-                { left, right -> left.add(right) })
-        val middlePoint = weightedPoint.div(totalMass.absoluteValue())
-        return MassObject(blockName, middlePoint, totalMass, masses)
+//        val value = masses.first().attraction
+//        val firstPoint = value.weightedPosition(masses.first().point)
+//
+//        //val totalMass = masses.map { it.value }.reduce { acc: A, it: A -> acc.add(it) }
+//        val totalMass = masses.map { it.attraction }.reduce { acc: A, it: A -> acc.add(it) }
+//        val weightedPoint = masses.stream()
+//            .skip(1)
+//            .map { it.attraction.weightedPosition(it.point) }
+//            .collect(
+//                { firstPoint },
+//                { left, right -> left.add(right) },
+//                { left, right -> left.add(right) })
+//        val middlePoint = weightedPoint.div(totalMass.absoluteValue())
+        return MassObject(blockName, masses)
 
     }
 

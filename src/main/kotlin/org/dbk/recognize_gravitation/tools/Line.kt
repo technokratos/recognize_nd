@@ -17,6 +17,9 @@ class Line<P : IPoint<P>, A : AttractionValue<A>>(
         return attractionValue
     }
 
+    fun length(): Double {
+        return (p1 - p0).length()
+    }
 
  }
 

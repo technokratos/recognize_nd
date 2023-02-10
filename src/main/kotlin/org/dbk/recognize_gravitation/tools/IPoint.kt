@@ -13,6 +13,7 @@ interface IPoint<T : IPoint<T>>: Comparable<T> {
     fun rotate(sin: Double, cos: Double): T
 
     operator fun div(denom: Double): T
+    operator fun times(scale : Double): T
     fun add(point: T): T
 
     fun multiply(vector: T): Double
@@ -24,4 +25,5 @@ interface IPoint<T : IPoint<T>>: Comparable<T> {
 
 
     fun <A: AttractionValue<A>> perpendicularToLine(line: Line<T,A>) : T
+    operator fun minus(p0: T): T
 }
