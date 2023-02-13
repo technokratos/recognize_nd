@@ -1,10 +1,6 @@
 package org.dbk.recognize_gravitation.tools
 
-import org.dbk.recognize_gravitation.tools.AttractionScalar
-import org.dbk.recognize_gravitation.tools.Mass
-import org.dbk.recognize_gravitation.tools.MassObject
-import org.dbk.recognize_gravitation.tools.Point
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 internal class MassObjectTest {
@@ -24,7 +20,7 @@ internal class MassObjectTest {
     fun getPoint2() {
         val masses = listOf(Mass(Point(0.0, 0.0), AttractionScalar(1.0)), Mass(Point(10.0, 10.0), AttractionScalar(10.0)))
         val massObject = MassObject("", masses)
-        assertEquals(Point(9.0, 9.0), massObject.point)
+        assertEquals(Point(9.090909090909092, 9.090909090909092), massObject.point)
     }
 
 }

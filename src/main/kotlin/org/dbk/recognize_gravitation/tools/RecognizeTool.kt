@@ -1,11 +1,17 @@
 package org.dbk.recognize_gravitation.tools
 
+import kotlin.math.cos
+import kotlin.math.sin
 
-class RecognizeTool<P: IPoint<P>, A: AttractionValue<A>>(
-    val catalog: List<Block<P,A>>,
-    val k: Double,// коэффициент усиления
-    val distanceDegree: Double,//степень расстояния
-    private val weightFunction: WeightFunction,//функция веса может быть скаляром, может быть вектором
+
+class RecognizeTool<P : IPoint<P>, A : AttractionValue<A>>(
+    private val catalog: List<Block<P, A>>,
+    private val forceK: Double = 1.0,// коэффициент усиления
+    val distanceDegree: Double = 2.0,//степень расстояния
+    private val angleK : Double = 1.0,
+    private val shiftK : Double = 1.0,
+    private val weightFunction: WeightFunction = WeightFunction.OpenContour,//функция веса может быть скаляром, может быть вектором
+    private val proximityLevel: Double = 1.0,
     private val fragmentation: Int = 1// from 1 to 2,3,4
 ) {
 
@@ -45,35 +51,88 @@ class RecognizeTool<P: IPoint<P>, A: AttractionValue<A>>(
      *  Далее все действия делать над матрицами, дабы избежать выделение памяти при операции над векторами.
      *
      */
-    fun recognize(graphs: List<Graph<P,A>>): Pair<Double, String>? {
+    fun recognize(graphs: List<Graph<P, A>>): Pair<Double, String>? {
         val mass = mapToMass(graphs)
 
         val results = masses.map { Pair(findNearestPosition(it, mass), it.name) }
         return results.maxByOrNull { it.first }
     }
 
-    fun findNearestPosition(first: MassObject<P,A>, second: MassObject<P,A>): Double {
-        val dir = second.point.subtract(first.point)
-
-        val resultantForcesByItems = first.masses.map { firstItem ->
-            val resultantForce = second.masses.map { anotherItem -> force(firstItem, anotherItem) }
-                .reduce { acc, p -> acc.add(p) }
-            Pair(firstItem, resultantForce)
-        }
-        val resultantForce = resultantForcesByItems.map { it.second }.reduce { acc, p -> acc.add(p) }
-        val center = first.point
-        resultantForcesByItems.map {pair ->
-            val position = pair.first.point
-            val force = pair.second
-            val attractionFunction: (Line<P, AttractionScalar>) -> AttractionScalar = { return@Line AttractionScalar(0.0) }
-
-            val line = Line(position, position.add(force), attractionFunction)
-            val perpendicularToLine = position.perpendicularToLine(line)
-
-        }
 
 
+    fun findNearestPosition(mass: MassObject<P, A>, baseMass: MassObject<P, A>): Double {
+        var angle = 0.0
+        val angleVelocity = 0.0
+        var shiftPosition =  mass.point.zero()
+        var velocity = mass.point.zero()
 
+        var firstMass = mass
+        val dir = baseMass.point.subtract(firstMass.point)
+        var resultantForce: P
+        do {
+
+            val resultantForcesByItems = firstMass.masses
+                .map { firstItem ->
+                    val resultantForceByItem = baseMass.masses.asSequence()
+                        .map { anotherItem -> force(firstItem, anotherItem) }
+                        .reduce { acc, p -> acc + p }
+                    Pair(firstItem, resultantForceByItem)
+                }
+            resultantForce = resultantForcesByItems.asSequence()
+                .map { it.second }
+                .reduce { acc, p -> acc + p }
+            val center = firstMass.point
+
+            resultantForce += (velocity * (-1.0) * 10.0)
+            val resultantMoment = resultantForcesByItems.asSequence()
+                .map { pair ->
+                    val position = pair.first.point
+                    val force = pair.second
+                    val forceVector = Vector(position, position.add(force))
+                    val perpendicularToLine = center.perpendicularToLine(forceVector)
+                    val moment = perpendicularToLine.crossProduct(force)
+                    moment
+                }.reduce { acc, p3 -> acc + p3 }
+
+            val inertia = firstMass.value
+            val momentOfInertia = firstMass.momentOfInertiaAroundOfAxis(resultantMoment)
+            //delta = acceleration * deltaTime
+            var deltaPosition: P = mass.point.zero()
+            if (center is Point) {
+                val deltaAngular = resultantMoment.z / momentOfInertia
+                deltaPosition = (resultantForce / inertia.absoluteValue()) * shiftK
+                angle += angleK * deltaAngular // todo 3 коэффициента по силе, по смещению и по углу поворота
+                velocity += deltaPosition
+                shiftPosition += velocity * shiftK
+            } else {
+                TODO("Not implement for P3")
+            }
+
+            firstMass =  firstMass.rotateAndMove(angle, center, shiftPosition)
+        } while (dir.length() > proximityLevel)
+
+
+
+        return resultantForce.length()
+
+    }
+
+    private fun rotateAndMove(
+        angle: Double,
+        firstMass: MassObject<P, A>,
+        center: P,
+        shiftPosition: P
+    ): MassObject<P, A> {
+        val sin = sin(Math.PI / 180 * angle)
+        val cos = cos(Math.PI / 180 * angle)
+        return MassObject(firstMass.name, firstMass.masses.map {
+                it.rotateAndMove(
+                    center,
+                    shiftPosition,
+                    sin,
+                    cos
+                )
+            })
 
     }
 
@@ -83,26 +142,26 @@ class RecognizeTool<P: IPoint<P>, A: AttractionValue<A>>(
      */
     private fun force(firstMass: Mass<P, A>, secondMass: Mass<P, A>): P {
         val massMultiplication = firstMass.attraction.correlation(secondMass.attraction)
-        val div = firstMass.point.subtract(secondMass.point)
+        val div = secondMass.point - firstMass.point
         val len = div.length()
         val dir = div / len
         // dir  * m1 * m2 * k / len^2
-        return (massMultiplication * k / (len * len)).getForceFromPointToPoint(dir)
+        return (massMultiplication * forceK / (len * len)).getForceFromPointToPoint(dir)
     }
 
 
-    private fun mapToMasses(catalog: List<Block<P,A>>): List<MassObject<P,A>> {
+    private fun mapToMasses(catalog: List<Block<P, A>>): List<MassObject<P, A>> {
         return catalog.map { mapToMass(it.graphs, it.blockName) }
     }
 
-    private fun mapToMass(graphs: List<Graph<P,A>>, blockName: String = ""): MassObject<P,A> {
+    fun mapToMass(graphs: List<Graph<P, A>>, blockName: String = ""): MassObject<P, A> {
         return when (weightFunction) {
             WeightFunction.OpenContour -> openContourWeight(graphs, blockName)
             else -> throw UnsupportedOperationException("Not support weight function $weightFunction")
         }
     }
 
-    private fun openContourWeight(graphs: List<Graph<P,A>>, blockName: String): MassObject<P,A> {
+    private fun openContourWeight(graphs: List<Graph<P, A>>, blockName: String): MassObject<P, A> {
         //for fragmentation  = 1
 
         val masses = graphs

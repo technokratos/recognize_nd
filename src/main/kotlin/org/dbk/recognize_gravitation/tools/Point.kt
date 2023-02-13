@@ -4,6 +4,8 @@ import java.util.*
 import java.util.function.ToDoubleFunction
 import kotlin.Comparator
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * @author Kulikov Denis
@@ -51,8 +53,12 @@ class Point(val x: Double, val y: Double) : IPoint<Point> {
     }
 
     override fun rotate(pointRot: Point, angle: Double): Point {
-        val cos = Math.cos(Math.PI / 180 * angle)
-        val sin = Math.sin(Math.PI / 180 * angle)
+        val cos = cos(Math.PI / 180 * angle)
+        val sin = sin(Math.PI / 180 * angle)
+        return rotate(pointRot, sin, cos)
+    }
+
+    override fun rotate(pointRot: Point, sin: Double, cos: Double): Point {
         val x = pointRot.x + (x - pointRot.x) * cos - (y - pointRot.y) * sin
         val y = pointRot.y + (this.x - pointRot.x) * sin + (y - pointRot.y) * cos
         return Point(x, y)
@@ -85,6 +91,22 @@ class Point(val x: Double, val y: Double) : IPoint<Point> {
         return of(x * scalex, y * scaley)
     }
 
+    override fun crossProduct(p: Point): P3 {
+        val ax = this.x
+        val ay = this.y
+        val bx = p.x
+        val by = p.y
+        return P3(0.0,0.0, ax * by - ay * bx)
+    }
+
+    override fun minus(p: Point): Point {
+        return subtract(p)
+    }
+
+    override fun plus(p: Point): Point {
+        return add(p)
+    }
+
     override fun equalsWithPrecision(p: Point): Boolean {
         return abs(p.x - x) / PRECISION < PRECISION && abs(p.y - y) / PRECISION < PRECISION
     }
@@ -99,7 +121,7 @@ class Point(val x: Double, val y: Double) : IPoint<Point> {
     }
 
     override fun toString(): String {
-        return "$x $y"
+        return "[$x;$y]"
     }
 
     override fun equals(o: Any?): Boolean {
@@ -150,11 +172,11 @@ class Point(val x: Double, val y: Double) : IPoint<Point> {
 
 
      */
-    override fun <A : AttractionValue<A>> perpendicularToLine(line: Line<Point, A>) : Point{
-        val P0x = line.p0.x
-        val P0y = line.p0.y
-        val P1x = line.p1.x
-        val P1y = line.p1.y
+    override fun perpendicularToLine(attractionVector: Vector<Point>) : Point{
+        val P0x = attractionVector.p0.x
+        val P0y = attractionVector.p0.y
+        val P1x = attractionVector.p1.x
+        val P1y = attractionVector.p1.y
         val Cx = this.x
         val Cy = this.y
         val t = (-Cx*P0x + Cx*P1x - Cy*P0y + Cy*P1y + P0x*P0x  - P0x*P1x + P0y*P0y  - P0y*P1y)/(P0x*P0x  - 2*P0x*P1x + P0y*P0y  - 2*P0y*P1y + P1x*P1x  + P1y*P1y)
@@ -166,5 +188,13 @@ class Point(val x: Double, val y: Double) : IPoint<Point> {
 
     override fun times(scale: Double): Point {
         return of(x * scale, y * scale)
+    }
+
+    override fun times(p: Point): Double {
+        return multiply(p)
+    }
+
+    override fun zero(): Point {
+        return Point(0.0,0.0)
     }
 }

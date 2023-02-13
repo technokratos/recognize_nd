@@ -11,6 +11,7 @@ interface IPoint<T : IPoint<T>>: Comparable<T> {
     fun rotate(angle: Double): T
     fun rotate(pointRot: T, angle: Double): T
     fun rotate(sin: Double, cos: Double): T
+    fun rotate(pointRot: T, sin: Double, cos: Double): T
 
     operator fun div(denom: Double): T
     operator fun times(scale : Double): T
@@ -20,10 +21,20 @@ interface IPoint<T : IPoint<T>>: Comparable<T> {
 
     fun multiply(scale: Double): T
     fun multiply(scalex: Double, scaley: Double): T
+
+    /**
+     * [a * b] = [ay * bz - az * by; az * bx -ax * bz; ax * by - ay * bx]
+     */
+    fun crossProduct(p: T): P3
     fun equalsWithPrecision(p: T): Boolean
     fun match(p: T): Boolean
 
 
-    fun <A: AttractionValue<A>> perpendicularToLine(line: Line<T,A>) : T
-    operator fun minus(p0: T): T
+    fun perpendicularToLine(attractionVector: Vector<T>) : T
+    operator fun minus(p: T): T
+    operator fun plus(p: T): T
+
+
+    operator fun times(perpendicularToLine: T): Double
+    fun zero(): T
 }

@@ -8,12 +8,17 @@ interface  AttractionValue<A : AttractionValue<A>>{
     operator fun div(d: Double): A
     operator fun times(d: Double): A
     fun <P : IPoint<P>> getForceFromPointToPoint(dir: P): P
+    operator fun plus(it: A): A {
+        return add(it)
+    }
 }
 
 class AttractionVector<T : IPoint<T>>(private val value: T) : AttractionValue<AttractionVector<T>> {
+
+
     override fun add(other: AttractionVector<T>): AttractionVector<T> {
 
-        return AttractionVector(value.add(other.value as T))
+        return AttractionVector(value.add(other.value))
     }
 
     override fun <P : IPoint<P>> weightedPosition(point:  P): P {
@@ -38,6 +43,21 @@ class AttractionVector<T : IPoint<T>>(private val value: T) : AttractionValue<At
 
     override fun <P : IPoint<P>> getForceFromPointToPoint(dir: P): P {
         TODO("Not yet implemented")
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as AttractionVector<*>
+
+        if (value != other.value) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return value.hashCode()
     }
 
 }
@@ -70,6 +90,9 @@ class AttractionScalar(val value: Double) : AttractionValue<AttractionScalar> {
         return AttractionScalar(value * d)
     }
 
+    override fun toString(): String {
+        return "A($value)"
+    }
 
 
 }
