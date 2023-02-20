@@ -31,7 +31,7 @@ internal class RecognizeToolTest {
             AttractionLine(Point(10.0, 10.0), Point(110.0, 10.0), attractionFunction),
             AttractionLine(Point(110.0, 10.0), Point(110.0, 60.0), attractionFunction)
         ))
-        val force = recognizeTool.findNearestPosition( firstMass, secondMass)
+        val force = recognizeTool.findMaxForceByRotation( firstMass, secondMass)
         assertTrue(force > 0)
     }
 }

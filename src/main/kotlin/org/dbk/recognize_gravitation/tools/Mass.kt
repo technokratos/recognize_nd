@@ -56,13 +56,13 @@ class MassObject<T : IPoint<T>, A : AttractionValue<A>>(
     }
 
     fun rotateAndMove(
-        angle: Double,
         center: T,
-        shiftPosition: T
+        shiftPosition: T,
+        radian: Double
     ): MassObject<T, A> {
 
-        val sin = sin(Math.PI / 180 * angle)
-        val cos = cos(Math.PI / 180 * angle)
+        val sin = sin(radian)
+        val cos = cos(radian)
         return MassObject(this.name, this.masses.map {
             it.rotateAndMove(
                 center,

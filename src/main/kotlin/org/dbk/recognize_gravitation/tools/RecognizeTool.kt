@@ -1,17 +1,16 @@
 package org.dbk.recognize_gravitation.tools
 
-import kotlin.math.cos
-import kotlin.math.sin
+import kotlin.math.*
 
 
 class RecognizeTool<P : IPoint<P>, A : AttractionValue<A>>(
     private val catalog: List<Block<P, A>>,
     private val forceK: Double = 1.0,// коэффициент усиления
     val distanceDegree: Double = 2.0,//степень расстояния
-    private val angleK : Double = 1.0,
-    private val shiftK : Double = 1.0,
+    private val angleK: Double = 1.0,
+    private val shiftK: Double = 1.0,
     private val weightFunction: WeightFunction = WeightFunction.OpenContour,//функция веса может быть скаляром, может быть вектором
-    private val proximityLevel: Double = 1.0,
+    private val proximityLevel: Double = 0.01,
     private val fragmentation: Int = 1// from 1 to 2,3,4
 ) {
 
@@ -54,68 +53,137 @@ class RecognizeTool<P : IPoint<P>, A : AttractionValue<A>>(
     fun recognize(graphs: List<Graph<P, A>>): Pair<Double, String>? {
         val mass = mapToMass(graphs)
 
-        val results = masses.map { Pair(findNearestPosition(it, mass), it.name) }
+        val results = masses.map { Pair(findMaxForceByRotation(it, mass), it.name) }
         return results.maxByOrNull { it.first }
     }
 
 
+    fun findMaxForceByRotation(mass: MassObject<P, A>, baseMass: MassObject<P, A>): Double {
+        val baseDeltaAngle = Math.PI / 180 * 2
+        val lambda = 0.1
 
-    fun findNearestPosition(mass: MassObject<P, A>, baseMass: MassObject<P, A>): Double {
         var angle = 0.0
-        val angleVelocity = 0.0
-        var shiftPosition =  mass.point.zero()
-        var velocity = mass.point.zero()
 
-        var firstMass = mass
-        val dir = baseMass.point.subtract(firstMass.point)
-        var resultantForce: P
+        var deltaAngle = baseDeltaAngle
+
+        val center = baseMass.point
+        val shiftPosition = center.subtract(mass.point)
+
+
+        var mass0 = mass.rotateAndMove(center, shiftPosition, angle)
+        var prevF = getResultantForce(mass0, baseMass)
+        angle += deltaAngle
+
+
+        var force: Double = 0.0
+        val multiplicationMass = mass.value.absoluteValue() * baseMass.value.absoluteValue()
+        var maxForce : Double = prevF
         do {
-
-            val resultantForcesByItems = firstMass.masses
-                .map { firstItem ->
-                    val resultantForceByItem = baseMass.masses.asSequence()
-                        .map { anotherItem -> force(firstItem, anotherItem) }
-                        .reduce { acc, p -> acc + p }
-                    Pair(firstItem, resultantForceByItem)
-                }
-            resultantForce = resultantForcesByItems.asSequence()
-                .map { it.second }
-                .reduce { acc, p -> acc + p }
-            val center = firstMass.point
-
-            resultantForce += (velocity * (-1.0) * 10.0)
-            val resultantMoment = resultantForcesByItems.asSequence()
-                .map { pair ->
-                    val position = pair.first.point
-                    val force = pair.second
-                    val forceVector = Vector(position, position.add(force))
-                    val perpendicularToLine = center.perpendicularToLine(forceVector)
-                    val moment = perpendicularToLine.crossProduct(force)
-                    moment
-                }.reduce { acc, p3 -> acc + p3 }
-
-            val inertia = firstMass.value
-            val momentOfInertia = firstMass.momentOfInertiaAroundOfAxis(resultantMoment)
-            //delta = acceleration * deltaTime
-            var deltaPosition: P = mass.point.zero()
-            if (center is Point) {
-                val deltaAngular = resultantMoment.z / momentOfInertia
-                deltaPosition = (resultantForce / inertia.absoluteValue()) * shiftK
-                angle += angleK * deltaAngular // todo 3 коэффициента по силе, по смещению и по углу поворота
-                velocity += deltaPosition
-                shiftPosition += velocity * shiftK
-            } else {
-                TODO("Not implement for P3")
+            val mass1 = mass0.rotateAndMove(center, center.zero(), angle)
+            val nextF = getResultantForce(mass1, baseMass)
+            //if center instance of P2
+            //rotation axis is 0Z - axis
+            val deltaF = nextF - prevF
+            val deltaAngle = baseDeltaAngle * sign(deltaF)//согласовать масштаб силы и с масштабом произведения масс
+            angle += deltaAngle
+            prevF = nextF
+            force = nextF
+            if (nextF > maxForce) {
+                maxForce = nextF
             }
+        } while (abs(maxForce - prevF) > proximityLevel)
 
-            firstMass =  firstMass.rotateAndMove(angle, center, shiftPosition)
-        } while (dir.length() > proximityLevel)
-
-
-
-        return resultantForce.length()
-
+        return force / (multiplicationMass)
     }
+    fun findMaxForceByGradient(mass: MassObject<P, A>, baseMass: MassObject<P, A>): Double {
+        val baseDeltaAngle = Math.PI / 180 * 2
+        val lambda = 0.1
+
+        var angle = 0.0
+
+        var deltaAngle = baseDeltaAngle
+
+        val center = baseMass.point
+        val shiftPosition = center.subtract(mass.point)
+
+
+        var leftMass = mass.rotateAndMove(center, shiftPosition, angle - deltaAngle)
+        var rightMass = mass.rotateAndMove(center, shiftPosition, angle + deltaAngle)
+        var leftForce = getResultantForce(rightMass, baseMass)
+        var force = getResultantForce(mass, baseMass)
+        var rightForce = getResultantForce(rightMass, baseMass)
+
+        var dir = rightForce > leftForce
+
+        
+
+
+
+
+        val multiplicationMass = mass.value.absoluteValue() * baseMass.value.absoluteValue()
+        var maxForce : Double = prevF
+        do {
+            val mass1 = rightMass.rotateAndMove(center, center.zero(), angle)
+            val nextF = getResultantForce(mass1, baseMass)
+            //if center instance of P2
+            //rotation axis is 0Z - axis
+            val deltaF = nextF - prevF
+            val deltaAngle = baseDeltaAngle * sign(deltaF)//согласовать масштаб силы и с масштабом произведения масс
+            angle += deltaAngle
+            prevF = nextF
+            force = nextF
+            if (nextF > maxForce) {
+                maxForce = nextF
+            }
+        } while (abs(maxForce - prevF) > proximityLevel)
+
+        return force / (multiplicationMass)
+    }
+
+    private fun getResultantForce(
+        firstMass: MassObject<P, A>,
+        baseMass: MassObject<P, A>
+    ): Double {
+        val resultantForcesByItems = firstMass.masses
+            .asSequence()
+            .map { firstItem ->
+                val resultantForceByItem = baseMass.masses.asSequence()
+                    .map { anotherItem -> force(firstItem, anotherItem) }
+                    .reduce { acc, p -> acc + p }
+                Pair(firstItem, resultantForceByItem)
+            }
+        //todo merge two streams
+        return resultantForcesByItems
+            .map { it.second }
+            .reduce { acc, p -> acc + p }
+    }
+
+//    private fun getMoment(
+//        firstMass: MassObject<P, A>,
+//        baseMass: MassObject<P, A>
+//    ): Double {
+//        val resultantForcesByItems = firstMass.masses
+//            .map { firstItem ->
+//                val resultantForceByItem = baseMass.masses.asSequence()
+//                    .map { anotherItem -> force(firstItem, anotherItem) }
+//                    .reduce { acc, p -> acc + p }
+//                Pair(firstItem, resultantForceByItem)
+//            }
+//        val resultantForce = resultantForcesByItems.asSequence()
+//            .map { it.second }
+//            .reduce { acc, p -> acc + p }
+//
+//        val resultantMoment = resultantForcesByItems.asSequence()
+//            .map { pair ->
+//                val position = pair.first.point
+//                val force = pair.second
+//                val forceVector = Vector(position, position.add(force))
+//                val perpendicularToLine = firstMass.point.perpendicularToLine(forceVector)
+//                val moment = perpendicularToLine.crossProduct(force)
+//                moment
+//            }.reduce { acc, p3 -> acc + p3 }
+//        return Pair(resultantForce, resultantMoment)
+//    }
 
     private fun rotateAndMove(
         angle: Double,
@@ -126,13 +194,13 @@ class RecognizeTool<P : IPoint<P>, A : AttractionValue<A>>(
         val sin = sin(Math.PI / 180 * angle)
         val cos = cos(Math.PI / 180 * angle)
         return MassObject(firstMass.name, firstMass.masses.map {
-                it.rotateAndMove(
-                    center,
-                    shiftPosition,
-                    sin,
-                    cos
-                )
-            })
+            it.rotateAndMove(
+                center,
+                shiftPosition,
+                sin,
+                cos
+            )
+        })
 
     }
 
@@ -140,13 +208,24 @@ class RecognizeTool<P : IPoint<P>, A : AttractionValue<A>>(
      * F = k * m1 * m2 / R^2
      *
      */
-    private fun force(firstMass: Mass<P, A>, secondMass: Mass<P, A>): P {
+//    private fun force(firstMass: Mass<P, A>, secondMass: Mass<P, A>): P {
+//        val massMultiplication = firstMass.attraction.correlation(secondMass.attraction)
+//        val div = secondMass.point - firstMass.point
+//        val len = div.length()
+//        if (len != 0.0) { //todo compare with precision
+//            val dir = div / len
+//            return (massMultiplication * forceK / (len * len)).getForceFromPointToPoint(dir)
+//        } else {
+//
+//        }
+//    }
+    private fun force(firstMass: Mass<P, A>, secondMass: Mass<P, A>): Double {
         val massMultiplication = firstMass.attraction.correlation(secondMass.attraction)
         val div = secondMass.point - firstMass.point
-        val len = div.length()
-        val dir = div / len
-        // dir  * m1 * m2 * k / len^2
-        return (massMultiplication * forceK / (len * len)).getForceFromPointToPoint(dir)
+        val lenSquared = div.lengthSquared()
+        val limitedSquaredLen = max(lenSquared, 1.0)
+        return massMultiplication.absoluteValue() * forceK / limitedSquaredLen
+
     }
 
 
